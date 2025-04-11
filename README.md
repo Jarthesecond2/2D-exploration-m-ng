@@ -1,1 +1,1 @@
-# 2D-exploration-m-ng
+# 2D-exploration-game
