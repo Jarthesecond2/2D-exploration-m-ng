@@ -5,6 +5,7 @@ from Player import Player
 from trash_can import TrashCan
 from inventory import Inventory
 from utils import search_trash_can
+from shop_npc import ShopNPC
 
 class Game:
     def __init__(self):
@@ -13,6 +14,7 @@ class Game:
         self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         self.settings.screen_width, self.settings.screen_height = self.screen.get_size()
         pygame.display.set_caption(self.settings.caption)
+        self.shop_npc= ShopNPC(600, 200)
 
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont(None, 30)
@@ -27,10 +29,23 @@ class Game:
         self.message = ""
         self.inventory = Inventory(max_items=24, font=self.font, scale=self.scale)
         self.last_search_time = 0
+        self.last_shop_toggle_time = 0
+        self.shop_toggle_cooldown = 500
         self.cooldown = 1000
         self.inventory_open = False
         self.fullscreen = True
 
+    def draw_shop_menu(self):
+        box_width, box_height = 300, 200
+        box_x = self.settings.screen_width // 2 - box_width // 2
+        box_y = self.settings.screen_height // 2 - box_height // 2
+
+        pygame.draw.rect(self.screen, (250, 250, 200), (box_x, box_y, box_width, box_height))
+        pygame.draw.rect(self.screen, (0, 0, 0), (box_x, box_y, box_width, box_height), 3)
+
+        for i, item in enumerate(self.shop_npc.items_for_sale):
+            text = self.font.render(f"{item} - $10", True, (0, 0, 0))
+            self.screen.blit(text, (box_x + 20, box_y + 20 + i * 40))
 
     def draw_play_button(self):
         self.screen.fill((0, 200, 0))
@@ -82,7 +97,8 @@ class Game:
                     running = False
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_i:
-                        self.inventory_open = not self.inventory_open
+                        if not self.shop_npc.is_open:
+                            self.inventory_open = not self.inventory_open
                     elif event.key == pygame.K_F11:
                         self.fullscreen = not self.fullscreen
                         if self.fullscreen:
@@ -95,24 +111,34 @@ class Game:
 
             keys = pygame.key.get_pressed()
             self.player.handle_movement(keys)
+            
+            if self.shop_npc.is_open and not self.player.rect.colliderect(self.shop_npc.rect):
+                self.shop_npc.is_open = False
 
             if keys[pygame.K_e]:
                 current_time = pygame.time.get_ticks()
-                if current_time - self.last_search_time >= self.cooldown:
-                    for can in self.trash_cans:
-                        if self.player.rect.colliderect(can):
-                            item = search_trash_can()
-                            self.message = f"You found: {item}"
-                            if item != "Nothing":
-                                self.inventory.add_item(item)
-                            self.last_search_time = current_time
-                            break
 
+                if current_time - self.last_shop_toggle_time >= self.shop_toggle_cooldown:
+                    if self.shop_npc.is_near_player(self.player.rect):
+                        self.shop_npc.is_open = not self.shop_npc.is_open
+                        self.last_shop_toggle_time = current_time
+
+                    elif current_time - self.last_search_time >= self.cooldown:
+                        for can in self.trash_cans:
+                            if self.player.rect.colliderect(can):
+                                item = search_trash_can()
+                                self.message = f"You found: {item}"
+                                if item != "Nothing":
+                                    self.inventory.add_item(item)
+                                self.last_search_time = current_time
+                                break
             self.player.draw(self.screen)
 
             for can in self.trash_cans:
                 can.draw(self.screen)
-
+            
+            self.shop_npc.draw(self.screen)
+            
             message_surface = self.font.render(self.message, True, (0, 0, 0))
             self.screen.blit(message_surface, (20, 20))
 
@@ -120,7 +146,9 @@ class Game:
                 center_x = self.settings.screen_width // 2
                 center_y = self.settings.screen_height // 2
                 self.inventory.draw_menu(self.screen, center_x, center_y)
-            
+            if self.shop_npc.is_open:
+                self.draw_shop_menu()
+
             pygame.display.flip()
     
     def rescale_objects(self):
