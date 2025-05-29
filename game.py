@@ -6,6 +6,8 @@ from trash_can import TrashCan
 from inventory import Inventory
 from utils import search_trash_can
 from shop_npc import ShopNPC
+from redemption_center import RedemptionCenter
+
 
 class Game:
     def __init__(self):
@@ -34,6 +36,10 @@ class Game:
         self.cooldown = 1000
         self.inventory_open = False
         self.fullscreen = True
+        self.redemption_center = RedemptionCenter(700, 300)
+        self.money = 0
+        self.last_redeem_time = 0
+        self.redeem_cooldown = 500
 
     def draw_shop_menu(self):
         box_width, box_height = 300, 200
@@ -117,26 +123,41 @@ class Game:
 
             if keys[pygame.K_e]:
                 current_time = pygame.time.get_ticks()
-
                 if current_time - self.last_shop_toggle_time >= self.shop_toggle_cooldown:
                     if self.shop_npc.is_near_player(self.player.rect):
                         self.shop_npc.is_open = not self.shop_npc.is_open
                         self.last_shop_toggle_time = current_time
+    
+                if self.redemption_center.is_near_player(self.player.rect):
+                    if current_time - self.last_redeem_time >= self.redeem_cooldown:
+                        if "Bottle" in self.inventory.items:
+                            bottle_count = self.inventory.items.count("Bottle")
+                            self.money += bottle_count * 0.1
+                            self.inventory.items = [item for item in self.inventory.items if item != "Bottle"]
+                            self.message = f"Redeemed {bottle_count} bottles for ${bottle_count * 0.1}"
+                        else:
+                            self.message = "No bottles to redeem!"
+                        self.last_redeem_time = current_time
 
-                    elif current_time - self.last_search_time >= self.cooldown:
-                        for can in self.trash_cans:
-                            if self.player.rect.colliderect(can):
-                                item = search_trash_can()
-                                self.message = f"You found: {item}"
-                                if item != "Nothing":
-                                    self.inventory.add_item(item)
-                                self.last_search_time = current_time
-                                break
+                
+                    
+                if current_time - self.last_search_time >= self.cooldown:
+                    for can in self.trash_cans:
+                        if self.player.rect.colliderect(can):
+                            item = search_trash_can()
+                            self.message = f"You found: {item}"
+                            if item != "Nothing":
+                                self.inventory.add_item(item)
+                            self.last_search_time = current_time
+                            break
             self.player.draw(self.screen)
 
             for can in self.trash_cans:
                 can.draw(self.screen)
             
+            self.redemption_center.draw(self.screen)
+            money_text = self.font.render(f"Money: ${self.money}", True, (0, 0, 0))
+            self.screen.blit(money_text, (20, 50))
             self.shop_npc.draw(self.screen)
             
             message_surface = self.font.render(self.message, True, (0, 0, 0))
@@ -153,8 +174,7 @@ class Game:
     
     def rescale_objects(self):
         new_size = int(40 * self.scale)
-        self.player.rect.width = new_size
-        self.player.rect.height = new_size
+        self.player.rescale(new_size, new_size)
         self.player.speed = int(4 * self.scale)
         
         for can in self.trash_cans:

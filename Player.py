@@ -3,10 +3,11 @@
 import pygame
 
 class Player:
-    def __init__(self, x, y, width=40, height=40, color=(0, 100, 255), speed=4):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.color = color
+    def __init__(self, x, y, width=512, height=512, speed=4):
         self.speed = speed
+        self.image = pygame.image.load("assets/character.png").convert_alpha()
+        self.image = pygame.transform.scale(self.image, (width, height))
+        self.rect = self.image.get_rect(topleft=(x, y))
                  
     def handle_movement(self, keys):
         if keys[pygame.K_a]:
@@ -19,4 +20,11 @@ class Player:
             self.rect.y += self.speed
     
     def draw(self, screen):
-        pygame.draw.rect(screen, self.color, self.rect)
+        screen.blit(self.image, self.rect)
+
+    def rescale(self, width, height):
+        self.image = pygame.image.load("assets/character.png").convert_alpha()
+        self.image = pygame.transform.scale(self.image, (width, height))
+        self.rect = self.image.get_rect(topleft=self.rect.topleft)
+
+        self.player.rescale(240, 240)

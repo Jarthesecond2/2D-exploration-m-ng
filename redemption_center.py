@@ -1,0 +1,16 @@
+"""redemption_center"""
+
+import pygame
+
+
+class RedemptionCenter:
+    def __init__(self, x , y, width=60, height=80, color=(200, 0, 0)):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.color = color
+        self.is_open = False
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, self.color, self.rect)
+
+    def is_near_player(self, player_rect):
+        return self.rect.colliderect(player_rect)
