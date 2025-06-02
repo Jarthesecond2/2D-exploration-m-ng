@@ -7,7 +7,7 @@ from inventory import Inventory
 from utils import search_trash_can
 from shop_npc import ShopNPC
 from redemption_center import RedemptionCenter
-
+from junkyard import Junkyard
 
 class Game:
     def __init__(self):
@@ -29,17 +29,24 @@ class Game:
             TrashCan(300, 250),
         ]
         self.message = ""
-        self.inventory = Inventory(max_items=24, font=self.font, scale=self.scale)
+        self.inventory = Inventory(max_items=20, font=self.font, scale=self.scale)
+
         self.last_search_time = 0
         self.last_shop_toggle_time = 0
         self.shop_toggle_cooldown = 500
         self.cooldown = 1000
+
         self.inventory_open = False
         self.fullscreen = True
+
         self.redemption_center = RedemptionCenter(700, 300)
         self.money = 0
         self.last_redeem_time = 0
         self.redeem_cooldown = 500
+
+        self.junkyard = Junkyard(400, 500)
+        self.trash_dispose_start = None
+        self.trash_dispose_duration = 3000
 
     def draw_shop_menu(self):
         box_width, box_height = 300, 200
@@ -127,7 +134,7 @@ class Game:
                     if self.shop_npc.is_near_player(self.player.rect):
                         self.shop_npc.is_open = not self.shop_npc.is_open
                         self.last_shop_toggle_time = current_time
-    
+
                 if self.redemption_center.is_near_player(self.player.rect):
                     if current_time - self.last_redeem_time >= self.redeem_cooldown:
                         if "Bottle" in self.inventory.items:
@@ -138,9 +145,24 @@ class Game:
                         else:
                             self.message = "No bottles to redeem!"
                         self.last_redeem_time = current_time
-
                 
-                    
+                if self.junkyard.is_near_player(self.player.rect):
+                    if "Trash" in self.inventory.items:
+                        current_time = pygame.time.get_ticks()
+                        if self.trash_dispose_start is None:
+                            self.trash_dispose_start = current_time
+                        elapsed = current_time - self.trash_dispose_start
+                        if elapsed  >= self.trash_dispose_duration:
+                                trash_count = self.inventory.items.count("Trash")
+                                self.inventory.items = [item for item in self.inventory.items if item != "Trash"]
+                                self.message = f"Disposed of {trash_count} trash at the junkyard."
+                                self.trash_dispose_start = None
+                    else:
+                        self.message = "No trash to dispose!"
+                        self.trash_dispose_start = None
+                else:
+                    self.trash_dispose_start = None
+    
                 if current_time - self.last_search_time >= self.cooldown:
                     for can in self.trash_cans:
                         if self.player.rect.colliderect(can):
@@ -150,7 +172,7 @@ class Game:
                                 self.inventory.add_item(item)
                             self.last_search_time = current_time
                             break
-            self.player.draw(self.screen)
+            
 
             for can in self.trash_cans:
                 can.draw(self.screen)
@@ -160,16 +182,29 @@ class Game:
             self.screen.blit(money_text, (20, 50))
             self.shop_npc.draw(self.screen)
             
+            self.junkyard.draw(self.screen)
+            self.player.draw(self.screen)
             message_surface = self.font.render(self.message, True, (0, 0, 0))
             self.screen.blit(message_surface, (20, 20))
-
+        
             if self.inventory_open:
                 center_x = self.settings.screen_width // 2
                 center_y = self.settings.screen_height // 2
                 self.inventory.draw_menu(self.screen, center_x, center_y)
             if self.shop_npc.is_open:
                 self.draw_shop_menu()
+            if self.trash_dispose_start:
+                elapsed = pygame.time.get_ticks() - self.trash_dispose_start
+                progress = min(elapsed / self.trash_dispose_duration, 1.0)
+    
+                bar_width = 200
+                bar_height = 20
+                bar_x = self.junkyard.rect.centerx - bar_width // 2
+                bar_y = self.junkyard.rect.top - 30
 
+                pygame.draw.rect(self.screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height))  # Background
+                pygame.draw.rect(self.screen, (0, 200, 0), (bar_x, bar_y, int(bar_width * progress), bar_height))  # Fill
+                pygame.draw.rect(self.screen, (0, 0, 0), (bar_x, bar_y, bar_width, bar_height), 2)  # Border
             pygame.display.flip()
     
     def rescale_objects(self):
